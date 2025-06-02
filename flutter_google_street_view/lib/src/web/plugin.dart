@@ -1,7 +1,7 @@
 part of 'package:flutter_google_street_view/flutter_google_street_view_web.dart';
 
 class FlutterGoogleStreetViewPlugin {
-  static bool _debug = false;
+  static final bool _debug = false;
 
   static Registrar? registrar;
 
@@ -21,15 +21,15 @@ class FlutterGoogleStreetViewPlugin {
 
   static void resetStreetVIewId() => _streetViewId = -1;
 
-  static Map<int, bool> _lockMap = {};
-  static Map<int, FlutterGoogleStreetViewPlugin> _plugins = {};
-  static Map<int, HtmlElement> _divs = {};
+  static final Map<int, bool> _lockMap = {};
+  static final Map<int, FlutterGoogleStreetViewPlugin> _plugins = {};
+  static final Map<int, HTMLElement> _divs = {};
 
   String _getViewType(int viewId) => "my_street_view_$viewId";
 
   // The Flutter widget that contains the rendered StreetView.
   HtmlElementView? _widget;
-  late HtmlElement _div;
+  late HTMLElement _div;
   late int _viewId;
 
   /// The view id of street view.
@@ -37,48 +37,55 @@ class FlutterGoogleStreetViewPlugin {
 
   /// The Flutter widget that will contain the rendered Map. Used for caching.
   Widget get htmlWidget {
-    if (_widget == null) {
-      _widget = HtmlElementView(
-        viewType: _getViewType(_viewId),
-      );
-    }
+    _widget ??= HtmlElementView(
+      viewType: _getViewType(_viewId),
+    );
     return _widget!;
   }
 
   static void lock() {}
 
-  MapsEventListener? _statusChangedListener;
-  MapsEventListener? _povChangedListener;
-  MapsEventListener? _zoomChangedListener;
-  MapsEventListener? _closeclickListener;
+  gmaps.MapsEventListener? _statusChangedListener;
+  gmaps.MapsEventListener? _povChangedListener;
+  gmaps.MapsEventListener? _zoomChangedListener;
+  gmaps.MapsEventListener? _closeclickListener;
 
   Future<void> _setup(Map<String, dynamic> arg, [bool isReuse = false]) async {
     StreetViewPanoramaOptions options;
     String? errorMsg;
     try {
-      options = await toStreetViewPanoramaOptions(arg);
+      options =
+          (await toStreetViewPanoramaOptions(arg)) as StreetViewPanoramaOptions;
     } catch (exception) {
-      NoStreetViewException noStreetViewException = (exception as NoStreetViewException);
-      options = noStreetViewException.options..visible = false;
+      NoStreetViewException noStreetViewException =
+          (exception as NoStreetViewException);
+      options = (noStreetViewException.options..visible = false)
+          as StreetViewPanoramaOptions;
       errorMsg = noStreetViewException.errorMsg;
     }
 
     Completer<bool> initDone = Completer();
-    if (!isReuse)
-      _streetViewPanorama = gmaps.StreetViewPanorama(_div, options);
-    else {
+    if (!isReuse) {
+      _streetViewPanorama = street_view.StreetViewPanorama(
+        _div,
+        options as street_view.StreetViewPanoramaOptions?,
+      );
+    } else {
       //reuse _streetViewPanorama
       //set to invisible before init, then set visible after init done.
       StreetViewPanoramaOptions fakeOptions;
       try {
-        fakeOptions = await toStreetViewPanoramaOptions(arg)
-          ..visible = false;
+        fakeOptions = (await toStreetViewPanoramaOptions(arg)
+          ..visible = false) as StreetViewPanoramaOptions;
       } catch (exception) {
-        NoStreetViewException noStreetViewException = (exception as NoStreetViewException);
-        fakeOptions = noStreetViewException.options..visible = false;
+        NoStreetViewException noStreetViewException =
+            (exception as NoStreetViewException);
+        fakeOptions = (noStreetViewException.options..visible = false)
+            as StreetViewPanoramaOptions;
         errorMsg = noStreetViewException.errorMsg;
       }
-      _streetViewPanorama.options = fakeOptions;
+      _streetViewPanorama.options =
+          fakeOptions as street_view.StreetViewPanoramaOptions?;
     }
     if (options.visible != null && !options.visible!) {
       //visible set to false can't trigger onStatusChanged
@@ -90,13 +97,14 @@ class FlutterGoogleStreetViewPlugin {
         initWatchDog.cancel();
         initDone.complete(true);
         //delay visible to avoid show pre-pano
-        if (isReuse && options.visible!)
-          _streetViewPanorama.options = gmaps.StreetViewPanoramaOptions()
+        if (isReuse && options.visible!) {
+          _streetViewPanorama.options = street_view.StreetViewPanoramaOptions()
             ..visible = options.visible;
+        }
       });
     }
     initDone.future.then((done) {
-      _updateStatus(options);
+      _updateStatus(options as street_view.StreetViewPanoramaOptions);
       _streetViewInit = true;
       _setupListener();
       if (_viewReadyResult != null) {
@@ -130,16 +138,16 @@ class FlutterGoogleStreetViewPlugin {
     debug("FlutterGoogleStreetViewPlugin:$arg");
     _viewId = _streetViewId += 1;
     debug("create new plugin, viewId:$viewId");
-    _div = DivElement()
+    _div = (DivElement()
       ..id = _getViewType(_viewId)
       ..style.width = '100%'
-      ..style.height = '100%';
+      ..style.height = '100%') as HTMLElement;
     _divs[_viewId] = _div;
     _plugins[_viewId] ??= this;
-    ui.platformViewRegistry.registerViewFactory(
-      _getViewType(_viewId),
-      (int viewId) => _div,
-    );
+    // ui.platformViewRegistry.registerViewFactory(
+    //   _getViewType(_viewId),
+    //   (int viewId) => _div,
+    // );
     _setup(arg);
     _methodChannel = MethodChannel(
       'flutter_google_street_view_$viewId',
@@ -150,7 +158,7 @@ class FlutterGoogleStreetViewPlugin {
   }
 
   Type get _dTag => runtimeType;
-  late gmaps.StreetViewPanorama _streetViewPanorama;
+  late street_view.StreetViewPanorama _streetViewPanorama;
   late MethodChannel _methodChannel;
   Timer? _animator;
   DateTime? _animatorRunTimestame;
@@ -176,7 +184,7 @@ class FlutterGoogleStreetViewPlugin {
     _animator?.cancel();
     _releaseListener();
     _lockMap[viewId] = false;
-    _streetViewPanorama.options = gmaps.StreetViewPanoramaOptions()
+    _streetViewPanorama.options = street_view.StreetViewPanoramaOptions()
       //set to invisible
       ..visible = false
       // reset control setting
@@ -195,7 +203,7 @@ class FlutterGoogleStreetViewPlugin {
       ..scrollwheel = true
       ..panControl = true
       ..zoomControl = true
-      ..pov = (gmaps.StreetViewPov()
+      ..pov = (street_view.StreetViewPov()
         ..heading = 0
         ..pitch = 0)
       ..zoom = 1;
@@ -204,19 +212,31 @@ class FlutterGoogleStreetViewPlugin {
   //callback fun doc(https://developers.google.com/maps/documentation/javascript/reference/3.44/street-view#StreetViewPanorama-Events)
   void _setupListener() {
     _releaseListener();
-    _statusChangedListener =
-        _streetViewPanorama.addListener("status_changed", () {
-      _methodChannel.invokeMethod("pano#onChange", _getLocation());
-    });
-    _povChangedListener = _streetViewPanorama.addListener("pov_changed", () {
-      _methodChannel.invokeMethod("camera#onChange", _getPanoramaCamera());
-    });
-    _zoomChangedListener = _streetViewPanorama.addListener("zoom_changed", () {
-      _methodChannel.invokeMethod("camera#onChange", _getPanoramaCamera());
-    });
-    _closeclickListener = _streetViewPanorama.addListener("closeclick", () {
-      _methodChannel.invokeMethod("close#onClick", true);
-    });
+
+    _statusChangedListener = _streetViewPanorama.addListener(
+      "status_changed",
+      () {
+        _methodChannel.invokeMethod("pano#onChange", _getLocation());
+      } as JSFunction,
+    );
+    _povChangedListener = _streetViewPanorama.addListener(
+      "pov_changed",
+      () {
+        _methodChannel.invokeMethod("camera#onChange", _getPanoramaCamera());
+      } as JSFunction,
+    );
+    _zoomChangedListener = _streetViewPanorama.addListener(
+      "zoom_changed",
+      () {
+        _methodChannel.invokeMethod("camera#onChange", _getPanoramaCamera());
+      } as JSFunction,
+    );
+    _closeclickListener = _streetViewPanorama.addListener(
+      "closeclick",
+      () {
+        _methodChannel.invokeMethod("close#onClick", true);
+      } as JSFunction,
+    );
   }
 
   void _releaseListener() {
@@ -357,7 +377,8 @@ extension FlutterGoogleStreetViewPluginExtension
       });
 
   Future<Map<String, dynamic>> _updateInitOptions(Map arg) async {
-    gmaps.StreetViewPanoramaOptions options = gmaps.StreetViewPanoramaOptions();
+    street_view.StreetViewPanoramaOptions options =
+        street_view.StreetViewPanoramaOptions();
     options = await _setPosition(arg, options: options, toApply: false);
     options = _setStreetNamesEnabled(arg, options: options, toApply: false);
     options = _setUserNavigationEnabled(arg, options: options, toApply: false);
@@ -385,20 +406,23 @@ extension FlutterGoogleStreetViewPluginExtension
     return _streetViewIsReady();
   }
 
-  gmaps.StreetViewPanoramaOptions _animateTo(Map arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
-    final currentPov = _streetViewPanorama.pov!;
-    final bearingDef = currentPov.heading ?? 0;
-    final tiltDef = currentPov.pitch ?? 0;
-    final zoomDef = _streetViewPanorama.zoom ?? 0;
+  street_view.StreetViewPanoramaOptions _animateTo(
+    Map arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
+    final currentPov = _streetViewPanorama.pov;
+    final bearingDef = currentPov.heading;
+    final tiltDef = currentPov.pitch;
+    final zoomDef = _streetViewPanorama.zoom;
     final bearingTarget = arg['bearing'] as double? ?? bearingDef;
     final tiltTarget = arg['tilt'] as double? ?? tiltDef;
     final zoomTarget = arg['zoom'] as double? ?? zoomDef;
-    _options.pov = gmaps.StreetViewPov()
+    options0.pov = street_view.StreetViewPov()
       ..heading = bearingTarget
       ..pitch = tiltTarget;
-    _options.zoom = (arg['zoom'] as double? ?? 0) + zoomTarget;
+    options0.zoom = (arg['zoom'] as double? ?? 0) + zoomTarget;
 
     if (toApply) {
       final duration = arg["duration"] as int?;
@@ -413,14 +437,14 @@ extension FlutterGoogleStreetViewPluginExtension
         final zoomDiff = zoomTarget - zoomDef;
 
         Timer.periodic(Duration(milliseconds: 15), (timer) {
-          if (_animator == null) _animator = timer;
+          _animator ??= timer;
           final timeDis = DateTime.now().difference(_animatorRunTimestame!);
           final percent = min((timeDis.inMilliseconds / duration), 1);
 
           final bearingTarget = bearingDef + bearingDiff * percent;
           final tiltTarget = tiltDef + tiltDiff * percent;
           final zoomTarget = zoomDef + zoomDiff * percent;
-          final povTarget = gmaps.StreetViewPov()
+          final povTarget = street_view.StreetViewPov()
             ..heading = bearingTarget
             ..pitch = tiltTarget;
           _streetViewPanorama.pov = povTarget;
@@ -433,7 +457,7 @@ extension FlutterGoogleStreetViewPluginExtension
         });
       }
     }
-    return _options;
+    return options0;
   }
 
   Map<String, dynamic> _getLocation() =>
@@ -442,314 +466,365 @@ extension FlutterGoogleStreetViewPluginExtension
   Map<String, dynamic> _getPanoramaCamera() =>
       streetViewPanoramaCameraToJson(_streetViewPanorama);
 
-  Future<gmaps.StreetViewPanoramaOptions> _setPosition(Map arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) async {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  Future<street_view.StreetViewPanoramaOptions> _setPosition(
+    Map arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) async {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
 
     double? raduis = arg['radius'] as double?;
     String? source = arg['source'] as String?;
-    var request;
+    JSObject request;
     gmaps.LatLng? location;
     String? pano;
     if (arg['panoId'] != null) {
       pano = arg['panoId'];
-      request = gmaps.StreetViewPanoRequest()..pano = pano;
+      request = street_view.StreetViewPanoRequest()..pano = pano;
     } else {
       location = arg['position'] != null
           ? gmaps.LatLng(arg['position'][0], arg['position'][1])
           : _streetViewPanorama.position;
       final sourceTmp = source == "outdoor"
-          ? gmaps.StreetViewSource.OUTDOOR
-          : gmaps.StreetViewSource.DEFAULT;
-      request = gmaps.StreetViewLocationRequest()
+          ? street_view.StreetViewSource.OUTDOOR
+          : street_view.StreetViewSource.DEFAULT;
+      request = street_view.StreetViewLocationRequest()
         ..location = location
         ..radius = raduis
         ..source = sourceTmp;
     }
     Completer<bool> check = Completer();
 
-    void error(gmaps.StreetViewPanoramaData? data, status) {
-      final find = status == "OK";
-      if (find) {
-        if (location != null) {
-          _options.position = data!.location!.latLng;
-        } else {
-          _options.pano = data!.location!.pano;
-        }
-      } else {
-        final errorMsg = location != null
-            ? "Oops..., no valid panorama found with position:${location.lat}, ${location.lng}, try to change `position`, `radius` or `source`."
-            : pano != null
-                ? "Oops..., no valid panorama found with panoId:$pano, try to change `panoId`."
-                : "setPosition, catch unknown error.";
-        _methodChannel.invokeMethod("pano#onChange", {"error": errorMsg});
-      }
-      check.complete(find);
-    }
-
-    gmaps.StreetViewService().getPanorama(request, error);
+    street_view.StreetViewService().getPanorama(request);
 
     await check.future;
-    if (toApply) _apply(_options);
-    return _options;
+    if (toApply) _apply(options0);
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setStreetNamesEnabled(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setStreetNamesEnabled(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable = (arg is Map ? arg['streetNamesEnabled'] : arg) as bool? ??
         _isStreetNamesEnabled;
-    _options.showRoadLabels = enable;
+    options0.showRoadLabels = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setUserNavigationEnabled(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setUserNavigationEnabled(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable = (arg is Map ? arg['userNavigationEnabled'] : arg) as bool? ??
         _isUserNavigationEnabled;
-    _options.clickToGo = enable;
+    options0.clickToGo = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setAddressControl(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setAddressControl(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable = (arg is Map ? arg['addressControl'] : arg) as bool? ??
         _isAddressControl;
-    _options.addressControl = enable;
+    options0.addressControl = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setAddressControlOptions(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
+  street_view.StreetViewPanoramaOptions _setAddressControlOptions(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
     String? position =
         arg is Map ? arg['addressControlOptions'] : arg as String?;
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
-    _options.addressControlOptions = gmaps.StreetViewAddressControlOptions()
-      ..position = toControlPosition(position);
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
+    options0.addressControlOptions =
+        street_view.StreetViewAddressControlOptions()
+          ..position = toControlPosition(position);
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setDisableDefaultUI(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setDisableDefaultUI(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable = (arg is Map ? arg['disableDefaultUI'] : arg) as bool? ??
         _isDisableDefaultUI;
-    _options.disableDefaultUI = enable;
+    options0.disableDefaultUI = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setDisableDoubleClickZoom(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setDisableDoubleClickZoom(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable = (arg is Map ? arg['disableDoubleClickZoom'] : arg) as bool? ??
         _isDisableDoubleClickZoom;
-    _options.disableDoubleClickZoom = enable;
+    options0.disableDoubleClickZoom = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setEnableCloseButton(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setEnableCloseButton(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable = (arg is Map ? arg['enableCloseButton'] : arg) as bool? ??
         _isEnableCloseButton;
-    _options.enableCloseButton = enable;
+    options0.enableCloseButton = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setFullscreenControl(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setFullscreenControl(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable = (arg is Map ? arg['fullscreenControl'] : arg) as bool? ??
         _isFullscreenControl;
-    _options.fullscreenControl = enable;
+    options0.fullscreenControl = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setFullscreenControlOptions(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
+  street_view.StreetViewPanoramaOptions _setFullscreenControlOptions(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
     String? position =
         arg is Map ? arg['fullscreenControlOptions'] : arg as String?;
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
-    _options.fullscreenControlOptions = gmaps.FullscreenControlOptions()
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
+    options0.fullscreenControlOptions = gmaps.FullscreenControlOptions()
       ..position = toControlPosition(position);
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setLinksControl(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setLinksControl(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable =
         (arg is Map ? arg['linksControl'] : arg) as bool? ?? _isLinksControl;
-    _options.linksControl = enable;
+    options0.linksControl = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setMotionTracking(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setMotionTracking(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable = (arg is Map ? arg['motionTracking'] : arg) as bool? ??
         _isMotionTracking;
-    _options.motionTracking = enable;
+    options0.motionTracking = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setMotionTrackingControl(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setMotionTrackingControl(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable = (arg is Map ? arg['motionTrackingControl'] : arg) as bool? ??
         _isMotionTrackingControl;
-    _options.motionTrackingControl = enable;
+    options0.motionTrackingControl = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setMotionTrackingControlOptions(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
+  street_view.StreetViewPanoramaOptions _setMotionTrackingControlOptions(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
     String? position =
         arg is Map ? arg['motionTrackingControlOptions'] : arg as String?;
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
-    _options.motionTrackingControlOptions = gmaps.MotionTrackingControlOptions()
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
+    options0.motionTrackingControlOptions = gmaps.MotionTrackingControlOptions()
       ..position = toControlPosition(position);
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setPanControl(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setPanControl(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable =
         (arg is Map ? arg['panControl'] : arg) as bool? ?? _isPanControl;
-    _options.panControl = enable;
+    options0.panControl = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setPanControlOptions(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
+  street_view.StreetViewPanoramaOptions _setPanControlOptions(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
     String? position = arg is Map ? arg['panControlOptions'] : arg as String?;
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
-    _options.panControlOptions = gmaps.PanControlOptions()
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
+    options0.panControlOptions = gmaps.PanControlOptions()
       ..position = toControlPosition(position);
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setScrollwheel(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setScrollwheel(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable =
         (arg is Map ? arg['scrollwheel'] : arg) as bool? ?? _isScrollwheel;
-    _options.scrollwheel = enable;
+    options0.scrollwheel = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setZoomControl(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setZoomControl(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable =
         (arg is Map ? arg['zoomControl'] : arg) as bool? ?? _isZoomControl;
-    _options.zoomControl = enable;
+    options0.zoomControl = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setZoomControlOptions(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
+  street_view.StreetViewPanoramaOptions _setZoomControlOptions(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
     String? position = arg is Map ? arg['zoomControlOptions'] : arg as String?;
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
-    _options.zoomControlOptions = gmaps.ZoomControlOptions()
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
+    options0.zoomControlOptions = gmaps.ZoomControlOptions()
       ..position = toControlPosition(position);
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  gmaps.StreetViewPanoramaOptions _setVisible(dynamic arg,
-      {gmaps.StreetViewPanoramaOptions? options, bool toApply = true}) {
-    final _options = options ?? gmaps.StreetViewPanoramaOptions();
+  street_view.StreetViewPanoramaOptions _setVisible(
+    dynamic arg, {
+    street_view.StreetViewPanoramaOptions? options,
+    bool toApply = true,
+  }) {
+    final options0 = options ?? street_view.StreetViewPanoramaOptions();
     bool enable =
         (arg is Map ? arg['scrollwheel'] : arg) as bool? ?? _isVisible;
-    _options.visible = enable;
+    options0.visible = enable;
     if (toApply) {
-      _apply(_options);
+      _apply(options0);
     }
-    return _options;
+    return options0;
   }
 
-  void _apply(gmaps.StreetViewPanoramaOptions options) {
+  void _apply(street_view.StreetViewPanoramaOptions options) {
     _streetViewPanorama.options = options;
     _updateStatus(options);
   }
 
-  void _updateStatus(gmaps.StreetViewPanoramaOptions options) {
-    if (options.showRoadLabels != null)
+  void _updateStatus(street_view.StreetViewPanoramaOptions options) {
+    if (options.showRoadLabels != null) {
       _isStreetNamesEnabled = options.showRoadLabels!;
-    if (options.clickToGo != null)
+    }
+    if (options.clickToGo != null) {
       _isUserNavigationEnabled = options.clickToGo!;
-    if (options.addressControl != null)
+    }
+    if (options.addressControl != null) {
       _isAddressControl = options.addressControl!;
-    if (options.disableDefaultUI != null)
+    }
+    if (options.disableDefaultUI != null) {
       _isDisableDefaultUI = options.disableDefaultUI!;
-    if (options.disableDoubleClickZoom != null)
+    }
+    if (options.disableDoubleClickZoom != null) {
       _isDisableDoubleClickZoom = options.disableDoubleClickZoom!;
-    if (options.enableCloseButton != null)
+    }
+    if (options.enableCloseButton != null) {
       _isEnableCloseButton = options.enableCloseButton!;
-    if (options.fullscreenControl != null)
+    }
+    if (options.fullscreenControl != null) {
       _isFullscreenControl = options.fullscreenControl!;
+    }
     if (options.linksControl != null) _isLinksControl = options.linksControl!;
-    if (options.motionTracking != null)
+    if (options.motionTracking != null) {
       _isMotionTracking = options.motionTracking!;
-    if (options.motionTrackingControl != null)
+    }
+    if (options.motionTrackingControl != null) {
       _isMotionTrackingControl = options.motionTrackingControl!;
+    }
     if (options.scrollwheel != null) _isScrollwheel = options.scrollwheel!;
     if (options.panControl != null) _isPanControl = options.panControl!;
     if (options.zoomControl != null) _isZoomControl = options.zoomControl!;
