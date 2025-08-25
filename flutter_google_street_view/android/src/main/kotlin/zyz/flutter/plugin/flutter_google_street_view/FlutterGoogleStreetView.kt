@@ -614,7 +614,7 @@ class FlutterGoogleStreetView(
         )
     }
 
-    override fun onStreetViewPanoramaChange(location: StreetViewPanoramaLocation?) {
+    override fun onStreetViewPanoramaChange(location: StreetViewPanoramaLocation) {
     if (viewReadyResult != null) {
         val hasInitLocation = initOptions?.let { it1 ->
             it1.panoramaId != null || it1.position != null
@@ -625,20 +625,32 @@ class FlutterGoogleStreetView(
         }
     }
 
-    val arg = location?.let {
-        Convert.streetViewPanoramaLocationToJson(it)
-    } ?: mutableMapOf<String, Any>().apply {
-        val errorMsg = if (lastMoveToPos != null)
-            "Oops..., no valid panorama found with position:${lastMoveToPos!!.latitude}, ${lastMoveToPos!!.longitude}, try to change `position`, `radius` or `source`."
-        else if (lastMoveToPanoId != null)
-            "Oops..., no valid panorama found with panoId:$lastMoveToPanoId, try to change `panoId`."
-        else
-            "Oops..., no valid panorama found."
-        put("error", errorMsg)
-    }
+    try {
+        // Defensive check in case Google passes null unexpectedly
+        val arg = if (location != null) {
+            Convert.streetViewPanoramaLocationToJson(location)
+        } else {
+            mutableMapOf<String, Any>().apply {
+                val errorMsg = if (lastMoveToPos != null)
+                    "Oops..., no valid panorama found with position:${lastMoveToPos!!.latitude}, ${lastMoveToPos!!.longitude}, try to change `position`, `radius` or `source`."
+                else if (lastMoveToPanoId != null)
+                    "Oops..., no valid panorama found with panoId:$lastMoveToPanoId, try to change `panoId`."
+                else
+                    "Oops..., no valid panorama found."
+                put("error", errorMsg)
+            }
+        }
 
-    methodChannel.invokeMethod("pano#onChange", arg)
+        methodChannel.invokeMethod("pano#onChange", arg)
+    } catch (e: Exception) {
+        // Catch any NPE or unexpected error to avoid crash
+        val fallbackArg = mutableMapOf<String, Any>().apply {
+            put("error", "Street View panorama change failed: ${e.message}")
+        }
+        methodChannel.invokeMethod("pano#onChange", fallbackArg)
+    }
 }
+
 
 
     override fun onStreetViewPanoramaClick(orientation: StreetViewPanoramaOrientation) {
