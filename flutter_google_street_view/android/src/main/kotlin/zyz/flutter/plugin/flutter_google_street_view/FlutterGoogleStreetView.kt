@@ -615,41 +615,31 @@ class FlutterGoogleStreetView(
     }
 
     override fun onStreetViewPanoramaChange(location: StreetViewPanoramaLocation) {
-    if (viewReadyResult != null) {
-        val hasInitLocation = initOptions?.let { it1 ->
-            it1.panoramaId != null || it1.position != null
-        } ?: false
-        if (hasInitLocation) {
-            viewReadyResult?.success(streetViewIsReady())
-            viewReadyResult = null
-        }
-    }
-
-    try {
-        // Defensive check in case Google passes null unexpectedly
-        val arg = if (location != null) {
-            Convert.streetViewPanoramaLocationToJson(location)
-        } else {
-            mutableMapOf<String, Any>().apply {
-                val errorMsg = if (lastMoveToPos != null)
-                    "Oops..., no valid panorama found with position:${lastMoveToPos!!.latitude}, ${lastMoveToPos!!.longitude}, try to change `position`, `radius` or `source`."
-                else if (lastMoveToPanoId != null)
-                    "Oops..., no valid panorama found with panoId:$lastMoveToPanoId, try to change `panoId`."
-                else
-                    "Oops..., no valid panorama found."
-                put("error", errorMsg)
+        if (viewReadyResult != null) {
+            val hasInitLocation = initOptions?.let { it1 ->
+                it1.panoramaId != null || it1.position != null
+            } ?: false
+            if (hasInitLocation) {
+                viewReadyResult?.success(streetViewIsReady())
+                viewReadyResult = null
             }
         }
-
-        methodChannel.invokeMethod("pano#onChange", arg)
-    } catch (e: Exception) {
-        // Catch any NPE or unexpected error to avoid crash
-        val fallbackArg = mutableMapOf<String, Any>().apply {
-            put("error", "Street View panorama change failed: ${e.message}")
+        val arg = if (location.links.isNotEmpty()) location.let {
+            Convert.streetViewPanoramaLocationToJson(
+                it
+            )
+        } else mutableMapOf<String, Any>().apply {
+            val errorMsg = if (lastMoveToPos != null)
+                "Oops..., no valid panorama found with position:${lastMoveToPos!!.latitude}, ${lastMoveToPos!!.longitude}, try to change `position`, `radius` or `source`."
+            else if (lastMoveToPanoId != null)
+                "Oops..., no valid panorama found with panoId:$lastMoveToPanoId, try to change `panoId`."
+            else "Oops..., no valid panorama found."
+            put("error", errorMsg)
         }
-        methodChannel.invokeMethod("pano#onChange", fallbackArg)
+        methodChannel.invokeMethod(
+            "pano#onChange", arg
+        )
     }
-}
 
 
 
