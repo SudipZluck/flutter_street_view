@@ -614,32 +614,32 @@ class FlutterGoogleStreetView(
         )
     }
 
-    override fun onStreetViewPanoramaChange(location: StreetViewPanoramaLocation) {
-        if (viewReadyResult != null) {
-            val hasInitLocation = initOptions?.let { it1 ->
-                it1.panoramaId != null || it1.position != null
-            }  ?: false
-            if(hasInitLocation) {
-                viewReadyResult?.success(streetViewIsReady())
-                viewReadyResult = null
-            }
+    override fun onStreetViewPanoramaChange(location: StreetViewPanoramaLocation?) {
+    if (viewReadyResult != null) {
+        val hasInitLocation = initOptions?.let { it1 ->
+            it1.panoramaId != null || it1.position != null
+        } ?: false
+        if (hasInitLocation) {
+            viewReadyResult?.success(streetViewIsReady())
+            viewReadyResult = null
         }
-        val arg = location?.let {
-            Convert.streetViewPanoramaLocationToJson(
-                it
-            )
-        } ?: mutableMapOf<String, Any>().apply {
-            val errorMsg = if (lastMoveToPos != null)
-                "Oops..., no valid panorama found with position:${lastMoveToPos!!.latitude}, ${lastMoveToPos!!.longitude}, try to change `position`, `radius` or `source`."
-            else if (lastMoveToPanoId != null)
-                "Oops..., no valid panorama found with panoId:$lastMoveToPanoId, try to change `panoId`."
-            else "Oops..., no valid panorama found."
-            put("error", errorMsg)
-        }
-        methodChannel.invokeMethod(
-            "pano#onChange", arg
-        )
     }
+
+    val arg = location?.let {
+        Convert.streetViewPanoramaLocationToJson(it)
+    } ?: mutableMapOf<String, Any>().apply {
+        val errorMsg = if (lastMoveToPos != null)
+            "Oops..., no valid panorama found with position:${lastMoveToPos!!.latitude}, ${lastMoveToPos!!.longitude}, try to change `position`, `radius` or `source`."
+        else if (lastMoveToPanoId != null)
+            "Oops..., no valid panorama found with panoId:$lastMoveToPanoId, try to change `panoId`."
+        else
+            "Oops..., no valid panorama found."
+        put("error", errorMsg)
+    }
+
+    methodChannel.invokeMethod("pano#onChange", arg)
+}
+
 
     override fun onStreetViewPanoramaClick(orientation: StreetViewPanoramaOrientation) {
         methodChannel.invokeMethod(
